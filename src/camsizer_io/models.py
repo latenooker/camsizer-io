@@ -61,25 +61,29 @@ class CamsizerRun:
 
 @dataclass
 class ParticleRecord:
-    """One raw per-particle record sliced from an X-Plorer ``.xConAlp`` blob.
+    """One per-particle record decoded from an X-Plorer ``.xConAlp`` blob.
 
-    This is a *structural* decode only: the byte range is located via the
-    ``.xIdx`` offset table and the leading float32 stream is exposed as-is.
-    The split between contour vertices and the alpha (grayscale) raster, and
-    any physical calibration, are **not** resolved — see the module docstring
-    of :mod:`camsizer_io.xplorer`.
+    Each record is laid out as ``[2-byte flag][16 float32 descriptors][alpha
+    raster]``. The 16-value descriptor header is a **validated** per-particle
+    size/shape vector (its column aggregates reproduce the CSV summary; see
+    :mod:`camsizer_io.xplorer`). The trailing ``alpha`` bytes are the particle's
+    grayscale silhouette; 2-D structure is confirmed but the exact width/height
+    field is not, so it is exposed as a raw 1-D array (not reshaped).
 
     Attributes:
         index: Zero-based record index within the run.
         byte_offset: Start offset of this record inside the ``.xConAlp`` file.
         byte_length: Length of this record in bytes.
-        flag: The two-byte record prefix (raw), meaning unconfirmed.
-        floats: The record payload reinterpreted as little-endian float32
-            (after the 2-byte flag). Contains contour + alpha data, unseparated.
+        flag: The two-byte record prefix (raw); small integer, meaning unconfirmed.
+        descriptors: The 16 per-particle descriptor floats (size + shape).
+            See :data:`camsizer_io.xplorer.DESCRIPTOR_COLUMNS`.
+        alpha: The trailing grayscale silhouette bytes as a 1-D ``uint8`` array
+            (not reshaped to 2-D).
     """
 
     index: int
     byte_offset: int
     byte_length: int
     flag: bytes
-    floats: "object"  # numpy.ndarray[float32]; typed loosely to avoid a hard import here
+    descriptors: "object"  # numpy.ndarray[float32], shape (16,)
+    alpha: "object"  # numpy.ndarray[uint8], 1-D raw raster

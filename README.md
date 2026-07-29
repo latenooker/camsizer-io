@@ -8,7 +8,7 @@ Two paths, deliberately unequal in trust:
 |------|----------|--------|
 | CSV export → tidy PSD + shape tables | `read_csv` | **Reliable** — documented text format |
 | Grain-size statistics (Folk & Ward) | `folk_ward` | **Reliable** |
-| X-Plorer `.xIdx`/`.xConAlp` particle binaries | `read_xplorer` | ⚠️ **Experimental / reverse-engineered / unvalidated** |
+| Per-particle size/shape from `.xIdx`/`.xConAlp` | `read_xplorer` → `to_dataframe` | ⚠️ **Experimental / reverse-engineered** (descriptor *extraction* validated vs CSV; per-column names inferred) |
 
 The `.rdf` and `.cdf` raw binaries are intentionally **out of scope** — there is
 no published spec and the software is their authoritative reader.
@@ -46,30 +46,37 @@ Percentiles use the sedimentological "percent coarser" convention.
 
 ## Usage — the experimental path (read the warning)
 
+Each `.xConAlp` record is `[2-byte flag][16 float32 descriptors][alpha raster]`.
+The 16-value descriptor header is a **per-particle size/shape vector**, so you
+get a table of every detected particle:
+
 ```python
 run = cs.read_xplorer("OK_sand_2_005")     # .xIdx + .xConAlp beside this stem
-report = cs.validate_structure(run)         # structural self-consistency only
-rec = run.record(0)                         # raw float32 payload for one record
+cs.validate_structure(run).ok              # structural self-consistency
+df = run.to_dataframe()                     # (n_particles, 16): size_* (mm), shape_*
+rec = run.record(0)                         # rec.descriptors (16,), rec.alpha (uint8 raster)
 ```
 
-> ⚠️ **`read_xplorer` is reverse-engineered and unvalidated.** It performs a
-> *structural* decode only: it reads the `.xIdx` byte-offset table, slices
-> `.xConAlp` into per-record blocks, and exposes each block's raw `float32`
-> payload. It does **not** separate contour vertices from the alpha (grayscale)
-> raster, applies **no** physical calibration, and its record count is the raw
-> detection set — it does **not** equal the CSV `PDN` particle total. Every call
-> emits a `UserWarning`.
+> ⚠️ **`read_xplorer` is reverse-engineered.** What is *validated*: the
+> descriptor **extraction** — across all records the columns are finite and
+> in-family, and the volume-weighted x50 of the `xc_min`-family column
+> reproduces the CSV's reported value (0.311 vs 0.3099 mm). What is **not**
+> confirmed: the exact CAMSIZER name of each of the 16 columns (families and
+> `size_2` ≈ `xc_min` are validated; the rest are inferred), the width/height of
+> the alpha raster (returned raw/1-D), and that one record equals one PSD
+> particle (the record count is the raw detection set, ≠ the CSV `PDN` total).
+> Every call emits a `UserWarning`.
 >
-> **For real morphometry, export particle images from Particle X-Plorer** and
-> process them with an image pipeline (scikit-image / OpenCV). See
-> `docs/format_notes.md` for the byte-layout findings and
+> **For publication-grade morphometry from the silhouette *images*, export from
+> Particle X-Plorer** and process with an image pipeline (scikit-image / OpenCV).
+> See `docs/format_notes.md` for the byte-layout findings and
 > `pparadox/docs/sop_camsizer_dry_psd.md` §10.2–10.3.
 
 ## Supported / not supported
 
 - ✅ CAMSIZER X2 CSV export (dry mode), Folk & Ward stats
-- ⚠️ `.xIdx`/`.xConAlp` structural decode (experimental)
-- ❌ `.rdf`, `.cdf` decode; plotting; writing CAMSIZER formats; other instruments
+- ⚠️ `.xIdx`/`.xConAlp` per-particle descriptor table (extraction validated; column names inferred) + raw alpha rasters
+- ❌ `.rdf`, `.cdf` decode; reshaping/calibrating alpha images; plotting; writing CAMSIZER formats; other instruments
 
 ## Tests
 

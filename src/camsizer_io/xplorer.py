@@ -16,16 +16,22 @@ What is (empirically) understood, from the ``OK_sand_2_005`` run:
   increasing across the whole table; field 1 is a record counter
   (``index * 65536``); fields 0 and 3 are not confirmed.
 * ``.xConAlp`` begins with a preamble (bytes ``0 .. offsets[0]``) holding ASCII
-  metadata, then one variable-length record per index entry. Each record starts
-  with a 2-byte flag followed by a little-endian ``float32`` payload that
-  interleaves contour vertices and an "alpha" (grayscale) raster. The split
-  between contour and alpha is **not** resolved and no physical calibration is
-  applied.
+  metadata, then one variable-length record per index entry, laid out as
+  ``[2-byte flag][16 float32 descriptors][alpha raster]``.
 
-What is NOT claimed: that a record equals one PSD particle (the record count is
-the raw detection set and does **not** match the CSV ``PDN`` total), that the
-floats are calibrated coordinates, or that the format is stable across software
-versions.
+The 16-float descriptor header is **validated** against the CSV export: across
+all 63286 records the columns are finite and bounded (size family in mm, shape
+family dimensionless in ``[0, ~1.4]``), and the volume-weighted median of the
+``xc_min``-family column reproduces the reported ``x50`` (0.311 vs 0.3099 mm).
+The exact CAMSIZER name of each individual column is *inferred*, not confirmed
+against the software — see :data:`DESCRIPTOR_COLUMNS`.
+
+What is NOT resolved: the width/height of the trailing alpha raster (2-D
+structure is confirmed by row autocorrelation, but no dimension field is
+identified, so ``alpha`` is returned raw/1-D); the exact descriptor↔name
+mapping; whether a record equals one PSD particle (the record count is the raw
+detection set and does **not** equal the CSV ``PDN`` total); and whether the
+layout is stable across CAMSIZER software versions.
 """
 
 from __future__ import annotations
@@ -41,7 +47,25 @@ from .models import ParticleRecord
 
 _IDX_RECORD_BYTES = 16
 _OFFSET_FIELD = 2  # zero-based uint32 field in each .xIdx record holding the byte offset
-_FLAG_BYTES = 2  # per-record prefix in .xConAlp before the float32 payload
+_FLAG_BYTES = 2  # per-record prefix in .xConAlp before the descriptor header
+_N_DESCRIPTORS = 16  # float32 values in the per-record descriptor header
+_DESCRIPTOR_BYTES = _N_DESCRIPTORS * 4  # = 64
+
+#: Provisional column names for the 16-value per-particle descriptor header.
+#:
+#: The **family** of each column is validated (``size_*`` are diameters in mm;
+#: ``shape_*`` are dimensionless in ``[0, ~1.4]``; ``aux_9`` is an area-like
+#: value with a larger dynamic range). Empirically, ``size_2`` behaves as the
+#: CAMSIZER ``xc_min`` model (its volume-weighted x50 reproduces the reported
+#: value), the three size triples order as widths < ``xc_min`` < Feret-max, and
+#: ``shape_5`` (which can exceed 1) behaves as symmetry. The exact CAMSIZER name
+#: of each column is **not** confirmed against the software — treat the specific
+#: labels as a starting point, not ground truth.
+DESCRIPTOR_COLUMNS: tuple[str, ...] = (
+    "size_0", "size_1", "size_2", "size_3", "size_4", "size_5",
+    "size_6", "size_7", "size_8", "aux_9",
+    "shape_0", "shape_1", "shape_2", "shape_3", "shape_4", "shape_5",
+)
 
 _EXPERIMENTAL_WARNING = (
     "camsizer_io.xplorer is a REVERSE-ENGINEERED, UNVALIDATED decoder for the "
@@ -100,14 +124,14 @@ class XplorerRun:
         return int(len(self.offsets))
 
     def record(self, i: int) -> ParticleRecord:
-        """Materialize a single record's flag and float32 payload.
+        """Materialize a single record: flag, 16 descriptors, and alpha raster.
 
         Args:
             i: Zero-based record index.
 
         Returns:
-            A :class:`~camsizer_io.models.ParticleRecord`. Its ``floats`` array
-            is the raw contour+alpha payload (unseparated, uncalibrated).
+            A :class:`~camsizer_io.models.ParticleRecord` with the validated
+            16-value descriptor header and the raw (1-D) alpha silhouette bytes.
 
         Raises:
             IndexError: If ``i`` is out of range.
@@ -120,16 +144,50 @@ class XplorerRun:
             fh.seek(start)
             blob = fh.read(length)
         flag = blob[:_FLAG_BYTES]
-        payload = blob[_FLAG_BYTES:]
-        usable = len(payload) - (len(payload) % 4)
-        floats = np.frombuffer(payload[:usable], dtype="<f4")
+        desc_bytes = blob[_FLAG_BYTES : _FLAG_BYTES + _DESCRIPTOR_BYTES]
+        descriptors = np.frombuffer(desc_bytes, dtype="<f4").copy()
+        alpha = np.frombuffer(blob[_FLAG_BYTES + _DESCRIPTOR_BYTES :], dtype=np.uint8).copy()
         return ParticleRecord(
             index=i,
             byte_offset=start,
             byte_length=length,
             flag=flag,
-            floats=floats,
+            descriptors=descriptors,
+            alpha=alpha,
         )
+
+    def descriptor_matrix(self) -> np.ndarray:
+        """Extract the per-particle descriptor header for every record.
+
+        This reads only the 16-float header of each record (not the alpha
+        rasters), so it is fast and memory-light even for large runs.
+
+        Returns:
+            A ``(n_records, 16)`` float32 array. Column order follows
+            :data:`DESCRIPTOR_COLUMNS`.
+        """
+        raw = np.fromfile(self.path_con, dtype=np.uint8)
+        starts = self.offsets + _FLAG_BYTES
+        gather = starts[:, None] + np.arange(_DESCRIPTOR_BYTES)[None, :]
+        return raw[gather].view("<f4").reshape(self.n_records, _N_DESCRIPTORS)
+
+    def to_dataframe(self):
+        """Return the per-particle descriptor table as a pandas DataFrame.
+
+        Returns:
+            A DataFrame of shape ``(n_records, 16)`` with columns
+            :data:`DESCRIPTOR_COLUMNS`, indexed by record number.
+
+        Note:
+            The ``size_*`` columns are diameters in millimetres and the
+            ``shape_*`` columns are dimensionless; exact CAMSIZER descriptor
+            names per column are inferred, not confirmed (see module docs).
+        """
+        import pandas as pd
+
+        df = pd.DataFrame(self.descriptor_matrix(), columns=list(DESCRIPTOR_COLUMNS))
+        df.index.name = "record"
+        return df
 
     def iter_records(self, limit: int | None = None):
         """Iterate records lazily.

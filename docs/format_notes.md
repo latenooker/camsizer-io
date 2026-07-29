@@ -48,34 +48,61 @@ Field 2 is the load-bearing one: it is strictly monotonic across the whole table
 and stays within the `.xConAlp` file, so it cleanly partitions the container into
 per-record blocks. This is validated structurally (`validate_structure`).
 
-## `.xConAlp` (supported, structural only)
+## `.xConAlp` (supported: descriptors validated, alpha raster raw)
 
 Name reads as **Con**(tour) + **Alp**(ha).
 
 - Bytes `0 .. offsets[0]` (here 500504) are a **preamble** holding ASCII metadata
-  (`measure0`, the file name, etc.).
-- Each subsequent record = **2-byte flag** (`01 00`, sometimes `03 00`) + a
-  little-endian `float32` payload.
-- The leading floats of each record are small (~0.10–0.18), consistent with
-  normalized contour coordinates; later values in the block are large/mixed,
-  consistent with an interleaved **alpha (grayscale) raster**. The split point
-  between contour and alpha is **not** resolved.
-- Per-record payload size varies (≈210 B – 11 KB), i.e. larger particles carry
-  more data.
+  (`measure0`, the file name, etc.) then zero padding.
+- Each record has a fixed layout:
+
+  ```
+  [2-byte flag] [16 × float32 descriptors = 64 B] [alpha raster = uint8 …]
+  ```
+
+- Per-record payload size varies (≈210 B – 11 KB); the variation is entirely in
+  the trailing alpha raster (larger particles → larger silhouette).
+
+### The 16-float descriptor header (validated)
+
+Reading 16 `float32` at `offset + 2` yields a per-particle descriptor vector.
+Across **all 63286 records** the columns are finite and bounded (no NaNs, zero
+misaligned records), which confirms the alignment holds file-wide:
+
+| Cols | Family | Range (this run) | Notes |
+|------|--------|------------------|-------|
+| 0–8 | size (mm) | 0.001 – 1.045 | three triples ordering widths < `xc_min` < Feret-max |
+| 9 | area-like | 0 – 121 (99.9% < 3.5) | larger dynamic range; provisionally an area |
+| 10–15 | shape (dimensionless) | 0.076 – 1.436 | `shape_5` exceeds 1 → behaves as **symmetry** |
+
+**Cross-check against the CSV (ground truth `x50 = 0.3099` mm, xc_min model):**
+the volume-weighted (`w = x³`) median of column 2 is **0.311 mm** — a near-exact
+match — and the neighbouring size columns bracket it. Shape columns aggregate
+into the reported mean-shape ranges. This validates the *extraction*; the exact
+CAMSIZER name of each column is **inferred**, not confirmed against the software
+(see `DESCRIPTOR_COLUMNS` in `xplorer.py`).
+
+### The alpha raster (structure confirmed, dimensions not)
+
+The trailing `uint8` bytes are the particle's grayscale silhouette: values
+0–~250, ~30 % zeros (background). Row-stride autocorrelation shows strong 2-D
+structure (corr ≈ 0.6–0.9 at particle-specific widths), so it is a real image —
+but no explicit width/height field has been identified, so `read_xplorer`
+returns `alpha` as a raw 1-D array rather than guessing a reshape.
 
 ### What is NOT established
 
+- The exact CAMSIZER descriptor name of each of the 16 columns (only families
+  and column 2 ≈ `xc_min` are validated).
+- The width/height of the alpha raster.
 - That one record == one PSD particle. The record count (`63286`) is the raw
-  detection set and does **not** equal the CSV `PDN` total (`4252`); they measure
-  different things.
-- That the floats are calibrated to physical units.
-- Where contour ends and alpha begins within a record.
+  detection set and does **not** equal the CSV `PDN` total (`4252`).
 - Whether the layout is stable across CAMSIZER software versions.
 
-Because of the above, `read_xplorer` exposes raw per-record `float32` payloads
-and validates only structural self-consistency. **For publication-grade
-morphometry, export particle images from Particle X-Plorer** rather than relying
-on this decode.
+`read_xplorer` therefore exposes the **validated per-particle descriptor table**
+(`to_dataframe` / `descriptor_matrix`) plus raw alpha bytes, and validates
+structural self-consistency. For publication-grade morphometry from the
+silhouette *images*, still prefer exporting from Particle X-Plorer.
 
 ## `.rdf` / `.cdf` (out of scope)
 
