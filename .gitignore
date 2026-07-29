@@ -1,0 +1,16 @@
+# Large raw binary — the X-Plorer image container is 60+ MB per run; do not commit.
+# The small real fixtures (.csv/.rdf/.cdf/.xIdx) are committed for tests; the paired
+# .xConAlp lives outside git. See tests/fixtures/README.md.
+*.xConAlp
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.venv/
+venv/
