@@ -47,3 +47,40 @@ def test_canonical_size_def(size_model, expected):
 def test_canonical_size_def_rejects_empty():
     with pytest.raises(ValueError):
         _canonical_size_def(None)
+
+
+import warnings
+from pathlib import Path
+
+from camsizer_io import read_run
+from camsizer_io.models import SIZE_DEF_ORDER
+
+FIX = Path(__file__).parent / "fixtures"
+_STAMP = "20260804_180031_003"
+
+
+def test_read_run_finds_all_five_defs():
+    mrun = read_run(FIX / f"P_01_cs_xc_min_{_STAMP}.xle")
+    assert set(mrun.size_defs) == set(SIZE_DEF_ORDER)
+    assert mrun.sample == "P_01_cs"
+    assert mrun.timestamp == "20260804_180031"
+    assert mrun.seq == "003"
+    assert mrun["x_area"].summary["x50"] == pytest.approx(1.3419, abs=1e-4)
+    assert mrun["xMa_min"].summary["x50"] == pytest.approx(1.0063, abs=1e-4)
+
+
+def test_read_run_from_any_sibling_is_equivalent():
+    a = read_run(FIX / f"P_01_cs_xc_min_{_STAMP}.xle")
+    b = read_run(FIX / f"P_01_cs_xFemax_{_STAMP}.xle")
+    assert a.size_defs == b.size_defs
+    assert a.timestamp == b.timestamp
+
+
+def test_read_run_partial_warns(tmp_path):
+    # Only two of the five definitions present -> warn, still return them.
+    for tok in ("xc_min", "x_area"):
+        src = (FIX / f"P_01_cs_{tok}_{_STAMP}.xle").read_bytes()
+        (tmp_path / f"P_01_cs_{tok}_{_STAMP}.xle").write_bytes(src)
+    with pytest.warns(UserWarning):
+        mrun = read_run(tmp_path / f"P_01_cs_xc_min_{_STAMP}.xle")
+    assert set(mrun.size_defs) == {"xc_min", "x_area"}
