@@ -40,6 +40,27 @@ fw.median_phi, fw.sorting_phi, fw.skewness, fw.kurtosis
 writes: header metadata, the scalar summary block (x10/x50/x90, SPAN3, U3, shape
 means), and the per-size-class table.
 
+### Multiple size definitions
+
+A measurement run can save up to five size definitions (`xc_min`, `x_area`,
+`xFe_max`, `xFe_min`, `xMa_min`), one export file each. Read them as one run:
+
+```python
+import camsizer_io as cs
+
+mrun = cs.read_run("P_01_cs_xc_min_20260804_180031_003.xle")  # any one sibling
+mrun.size_defs                      # ['xc_min', 'x_area', 'xFe_max', ...]
+mrun["x_area"].summary["x50"]       # 1.3419 (mm), area-equivalent diameter
+cs.folk_ward(mrun)                  # Folk & Ward on xc_min (sieve-comparable)
+cs.folk_ward(mrun, size_def="x_area")
+
+runs = cs.read_batch("path/to/exports")   # list[MeasurementRun]
+long = cs.to_long(runs)                    # tidy: sample × size_def × class
+```
+
+`read_csv`/`read_export` read the auto-saved `.xle` (point decimal) and `.xld`
+(comma decimal) exports as well as the manual `.csv` — identical format.
+
 `folk_ward` interpolates percentiles from the cumulative `Q3` curve, converts to
 phi (`phi = -log2(mm)`), and returns the Folk & Ward (1957) graphical measures.
 Percentiles use the sedimentological "percent coarser" convention.

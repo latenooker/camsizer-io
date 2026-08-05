@@ -1,7 +1,9 @@
-# Test fixtures — run `OK_sand_2_005`
+# Test fixtures
+
+## `OK_sand_2_005` run
 
 Real CAMSIZER X2 output from a single dry X-Fall run (2026-07-28), used as the
-test fixture set.
+single-size-definition test fixture set.
 
 | File | Committed? | Used by |
 |------|-----------|---------|
@@ -19,3 +21,24 @@ is:
 ```
 pparadox/data/lab/camsizer/OK_sand_2_005.xConAlp
 ```
+
+## `P_01_cs … 20260804_180031_003` run
+
+Real CAMSIZER X2 output from a single dry X-Fall run with five size definitions
+(2026-08-04), used to test multi-size-definition reading and tidy export.
+
+**Source:** `/Volumes/LEXAR/Camsizer/PPX/cs/` (CAMSIZER X2, dry X-Fall, sands)
+
+**Fixtures** (five `.xle` files, one per size definition):
+
+| File | Committed? | Size def | x50 (mm) | Used by |
+|------|-----------|----------|----------|---------|
+| `P_01_cs_xc_min_20260804_180031_003.xle` | yes | `xc_min` | 1.0993 | `test_run_reader`, `test_batch_reader` |
+| `P_01_cs_x_area_20260804_180031_003.xle` | yes | `x_area` | 1.3419 | `test_run_reader`, `test_batch_reader` |
+| `P_01_cs_xFemax_20260804_180031_003.xle` | yes | `xFe_max` | 1.7783 | `test_run_reader`, `test_batch_reader` |
+| `P_01_cs_xFemin_20260804_180031_003.xle` | yes | `xFe_min` | 1.1386 | `test_run_reader`, `test_batch_reader` |
+| `P_01_cs_xMamin_20260804_180031_003.xle` | yes | `xMa_min` | 1.0063 | `test_run_reader`, `test_batch_reader` |
+
+All five files share the `20260804_180031_003` timestamp/sequence suffix, which
+groups them as a single run. Ground-truth x50 values are used to validate size
+definition reading and the `to_long` tidy export.

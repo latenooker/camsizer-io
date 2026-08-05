@@ -104,6 +104,51 @@ returns `alpha` as a raw 1-D array rather than guessing a reshape.
 structural self-consistency. For publication-grade morphometry from the
 silhouette *images*, still prefer exporting from Particle X-Plorer.
 
+## Multiple size definitions
+
+A single CAMSIZER X2 measurement can save exports under up to five size
+definitions: `xc_min` (minimum caliper), `x_area` (area-equivalent), `xFe_max`
+(maximum Feret), `xFe_min` (minimum Feret), `xMa_min` (maximum area minimum
+caliper). Each is saved to a separate export file; all files of one run share the
+same date/time/sequence suffix.
+
+### Filename convention
+
+```
+<sample>_cs_<sizedef>_<YYYYMMDD>_<HHMMSS>_<seq>.<ext>
+```
+
+The filename is parsed **from the right** (because tokens like `x_area` contain
+underscores). The grouping key that links all size definitions of one run is
+`<YYYYMMDD>_<HHMMSS>_<seq>`.
+
+### Size definition token → canonical map
+
+The filename tokens are decoded to canonical size-definition names:
+
+| Token | Canonical |
+|-------|-----------|
+| `xc_min` | `xc_min` |
+| `x_area` | `x_area` |
+| `xFemax` | `xFe_max` |
+| `xFemin` | `xFe_min` |
+| `xMamin` | `xMa_min` |
+
+The **canonical key is authoritative and comes from the `.csv`/`.xle` header field
+`size_model`** (e.g., `"xc_min with shape parameter 1.0000"`). The filename token
+is a cross-check only; it is ignored if the header disagrees.
+
+### Fines dump-bin
+
+X-Fall measurements (particularly of sands) commonly produce sub-measurement-range
+fines that are binned into the first size class. In the fixture run `P_01_cs …
+20260804_180031_003`, the first class (`0.0000–0.0500 mm`) contains
+`PDN ≈ 265 000` with `p3 ≈ 0.004 %` — negligible mass contributed by this
+dump-bin fines. The interpolation filter used for `percentile_mm` restricts
+interpolation to the strictly-increasing part of the `Q3` cumulative curve,
+which naturally excludes this bin from any percentile calculation. No special
+handling is required.
+
 ## `.rdf` / `.cdf` (out of scope)
 
 Header + a block of IEEE-754 doubles (summary statistics) followed by

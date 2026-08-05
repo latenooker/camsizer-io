@@ -60,7 +60,8 @@ def read_csv(path: str | Path) -> CamsizerRun:
     """Read a CAMSIZER X2 CSV export into a :class:`CamsizerRun`.
 
     Args:
-        path: Path to the ``.csv`` export (UTF-16LE, tab-delimited).
+        path: Path to the ``.csv``, ``.xle``, or ``.xld`` export (UTF-16LE,
+            tab-delimited; identical format).
 
     Returns:
         A populated :class:`CamsizerRun` with ``meta``, ``psd`` and
@@ -80,6 +81,12 @@ def read_csv(path: str | Path) -> CamsizerRun:
     psd = _parse_table(rows)
 
     return CamsizerRun(meta=meta, psd=psd, summary=summary, source_path=str(path))
+
+
+# `.xle` (point decimal) and `.xld` (comma decimal) exports share the CSV
+# export's exact three-region layout, so read_csv reads them unchanged. The
+# alias documents that these are supported too.
+read_export = read_csv
 
 
 def _parse_header(rows: list[list[str]]) -> RunMeta:

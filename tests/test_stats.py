@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from camsizer_io import folk_ward, percentile_mm, read_csv
+from camsizer_io import folk_ward, percentile_mm, read_csv, read_run, MeasurementRun
 
 FIXTURE = Path(__file__).parent / "fixtures" / "OK_sand_2_005.csv"
 
@@ -36,3 +36,30 @@ def test_folk_ward_well_sorted_sand(run):
     assert 0.0 < fw.sorting_phi < 0.7
     # Percentile diameters are returned in ascending phi (descending mm) order.
     assert fw.d_mm["d5"] > fw.d_mm["d95"]
+
+
+FIVE = Path(__file__).parent / "fixtures" / "P_01_cs_xc_min_20260804_180031_003.xle"
+
+
+def test_folk_ward_measurement_defaults_to_xc_min():
+    mrun = read_run(FIVE)
+    got = folk_ward(mrun)
+    ref = folk_ward(mrun["xc_min"])
+    assert got.median_phi == pytest.approx(ref.median_phi, abs=1e-9)
+    assert got.median_phi == pytest.approx(-0.1366, abs=1e-3)
+    assert got.sorting_phi == pytest.approx(0.6598, abs=1e-3)
+
+
+def test_folk_ward_measurement_size_def_override():
+    mrun = read_run(FIVE)
+    got = folk_ward(mrun, size_def="x_area")
+    assert got.d_mm["d50"] == pytest.approx(1.3419, rel=0.05)
+
+
+def test_folk_ward_measurement_missing_def_falls_back_and_warns():
+    run = read_csv(Path(__file__).parent / "fixtures" / "P_01_cs_x_area_20260804_180031_003.xle")
+    mrun = MeasurementRun(sample="P_01_cs", timestamp="20260804_180031",
+                          seq="003", runs={"x_area": run})
+    with pytest.warns(UserWarning):
+        got = folk_ward(mrun)  # xc_min absent -> fall back to x_area
+    assert got.d_mm["d50"] == pytest.approx(1.3419, rel=0.05)

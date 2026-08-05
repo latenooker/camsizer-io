@@ -87,3 +87,82 @@ class ParticleRecord:
     flag: bytes
     descriptors: "object"  # numpy.ndarray[float32], shape (16,)
     alpha: "object"  # numpy.ndarray[uint8], 1-D raw raster
+
+
+SIZE_DEF_ORDER: tuple[str, ...] = ("xc_min", "x_area", "xFe_max", "xFe_min", "xMa_min")
+
+_LONG_COLUMNS = ["sample", "timestamp", "seq", "size_def", "bin_lower",
+                 "bin_upper", "p3", "Q3", "SPHT3", "Symm3", "b_l3", "PDN"]
+
+
+@dataclass
+class MeasurementRun:
+    """One CAMSIZER measurement across its active size definitions.
+
+    A measurement run writes one export file per size definition (``xc_min``,
+    ``x_area`` ...), all sharing a filename ``<date>_<time>_<seq>`` suffix. This
+    container groups the parsed :class:`CamsizerRun`s by their canonical
+    size-definition key.
+
+    Attributes:
+        sample: Sample identity prefix (e.g. ``P_01_cs``).
+        timestamp: Shared ``<date>_<time>`` stamp (e.g. ``20260804_180031``).
+        seq: Shared sequence field (e.g. ``003``).
+        runs: Canonical size-definition key -> parsed :class:`CamsizerRun`.
+        source_dir: Directory the files were read from, if known.
+    """
+
+    sample: str
+    timestamp: str
+    seq: str
+    runs: dict[str, CamsizerRun] = field(default_factory=dict)
+    source_dir: str | None = None
+
+    @property
+    def size_defs(self) -> list[str]:
+        """Canonical size-definition keys present, in canonical order."""
+        known = [k for k in SIZE_DEF_ORDER if k in self.runs]
+        extra = [k for k in self.runs if k not in SIZE_DEF_ORDER]
+        return known + extra
+
+    @property
+    def by_size_def(self) -> dict[str, CamsizerRun]:
+        """The size-definition -> run mapping (alias of ``runs``)."""
+        return self.runs
+
+    @property
+    def primary(self) -> CamsizerRun:
+        """The ``xc_min`` run if present, else the first available definition.
+
+        Raises:
+            ValueError: If the run contains no size definitions.
+        """
+        if not self.runs:
+            raise ValueError("MeasurementRun has no size definitions.")
+        key = "xc_min" if "xc_min" in self.runs else self.size_defs[0]
+        return self.runs[key]
+
+    def __getitem__(self, key: str) -> CamsizerRun:
+        """Return the :class:`CamsizerRun` for canonical size-definition ``key``."""
+        return self.runs[key]
+
+    def to_long(self) -> pd.DataFrame:
+        """Return this run's size classes across its size definitions (tidy).
+
+        Returns:
+            A long-format DataFrame with columns
+            ``sample, timestamp, seq, size_def`` followed by the per-class PSD
+            columns. Size definitions appear in canonical order; empty runs
+            yield no rows.
+        """
+        frames = []
+        for size_def in self.size_defs:
+            psd = self.runs[size_def].psd.copy()
+            psd.insert(0, "size_def", size_def)
+            psd.insert(0, "seq", self.seq)
+            psd.insert(0, "timestamp", self.timestamp)
+            psd.insert(0, "sample", self.sample)
+            frames.append(psd)
+        if not frames:
+            return pd.DataFrame(columns=_LONG_COLUMNS)
+        return pd.concat(frames, ignore_index=True)[_LONG_COLUMNS]
