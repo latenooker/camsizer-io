@@ -108,14 +108,13 @@ def folk_ward(
         if size_def in run.runs:
             run = run.runs[size_def]
         else:
-            chosen = run.primary
             warnings.warn(
                 f"size_def {size_def!r} not in run {sorted(run.runs)}; "
                 f"using primary instead.",
                 UserWarning,
                 stacklevel=2,
             )
-            run = chosen
+            run = run.primary
     # Folk & Ward percentiles are defined as "percent coarser", whereas the
     # CAMSIZER Q3 curve is "percent finer (passing)". The p-th coarser
     # percentile is therefore read at Q3 = (100 - p) percent passing. This makes

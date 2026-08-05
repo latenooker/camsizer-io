@@ -53,8 +53,8 @@ token.
 **In scope**
 
 - `MeasurementRun` container composing up to five `CamsizerRun`s.
-- `read_run(path)` — from any one of a run's files (or its stem), discover the
-  siblings and assemble a `MeasurementRun`.
+- `read_run(path)` — from any one of a run's files, discover the siblings and
+  assemble a `MeasurementRun`.
 - `read_batch(dir, pattern="*.xle")` — group every matching file into
   `MeasurementRun`s.
 - `to_long(runs_or_run)` — one tidy long-format DataFrame across runs × size

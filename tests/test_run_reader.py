@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+from camsizer_io import read_batch, read_run, to_long
+from camsizer_io.models import SIZE_DEF_ORDER
 from camsizer_io.run_reader import (
     _canonical_size_def,
     _parse_run_filename,
@@ -49,12 +53,6 @@ def test_canonical_size_def_rejects_empty():
         _canonical_size_def(None)
 
 
-import warnings
-from pathlib import Path
-
-from camsizer_io import read_run
-from camsizer_io.models import SIZE_DEF_ORDER
-
 FIX = Path(__file__).parent / "fixtures"
 _STAMP = "20260804_180031_003"
 
@@ -86,7 +84,24 @@ def test_read_run_partial_warns(tmp_path):
     assert set(mrun.size_defs) == {"xc_min", "x_area"}
 
 
-from camsizer_io import read_batch, to_long
+def test_read_run_token_mismatch_warns(tmp_path):
+    # Header says xc_min but the filename token says xFemax -> trust the header.
+    src = (FIX / f"P_01_cs_xc_min_{_STAMP}.xle").read_bytes()
+    (tmp_path / f"P_01_cs_xFemax_{_STAMP}.xle").write_bytes(src)
+    with pytest.warns(UserWarning, match="trusting header"):
+        mrun = read_run(tmp_path / f"P_01_cs_xFemax_{_STAMP}.xle")
+    assert set(mrun.size_defs) == {"xc_min"}
+
+
+def test_read_run_duplicate_size_def_warns(tmp_path):
+    # Both files' headers say xc_min, so the run group has a duplicate
+    # canonical size definition even though their filename tokens differ.
+    src = (FIX / f"P_01_cs_xc_min_{_STAMP}.xle").read_bytes()
+    (tmp_path / f"P_01_cs_xc_min_{_STAMP}.xle").write_bytes(src)
+    (tmp_path / f"P_01_cs_xMamin_{_STAMP}.xle").write_bytes(src)
+    with pytest.warns(UserWarning, match="Duplicate size definition"):
+        mrun = read_run(tmp_path / f"P_01_cs_xc_min_{_STAMP}.xle")
+    assert set(mrun.size_defs) == {"xc_min"}
 
 
 def test_read_batch_groups_one_run():
