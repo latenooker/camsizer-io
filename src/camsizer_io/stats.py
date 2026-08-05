@@ -12,10 +12,11 @@ reports, not a number-weighted one.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 
-from .models import CamsizerRun
+from .models import CamsizerRun, MeasurementRun
 
 
 @dataclass
@@ -80,11 +81,17 @@ def percentile_mm(run: CamsizerRun, pct: float) -> float:
     return float(np.interp(pct, q3k, xk))
 
 
-def folk_ward(run: CamsizerRun) -> FolkWard:
+def folk_ward(
+    run: CamsizerRun | MeasurementRun, size_def: str = "xc_min"
+) -> FolkWard:
     """Compute Folk & Ward graphical statistics for a run.
 
     Args:
-        run: A parsed :class:`CamsizerRun`.
+        run: A parsed :class:`CamsizerRun`, or a :class:`MeasurementRun` (from
+            which one size definition is selected).
+        size_def: For a :class:`MeasurementRun`, the canonical size definition
+            to use (default ``xc_min``, the sieve-comparable width). Ignored for
+            a :class:`CamsizerRun`.
 
     Returns:
         A :class:`FolkWard` of phi-based statistics and the percentile
@@ -92,7 +99,23 @@ def folk_ward(run: CamsizerRun) -> FolkWard:
 
     Raises:
         ValueError: If percentiles cannot be interpolated from the run.
+
+    Warnings:
+        UserWarning: If ``size_def`` is not present in a :class:`MeasurementRun`;
+        the run's ``primary`` definition is used instead.
     """
+    if isinstance(run, MeasurementRun):
+        if size_def in run.runs:
+            run = run.runs[size_def]
+        else:
+            chosen = run.primary
+            warnings.warn(
+                f"size_def {size_def!r} not in run {sorted(run.runs)}; "
+                f"using primary instead.",
+                UserWarning,
+                stacklevel=2,
+            )
+            run = chosen
     # Folk & Ward percentiles are defined as "percent coarser", whereas the
     # CAMSIZER Q3 curve is "percent finer (passing)". The p-th coarser
     # percentile is therefore read at Q3 = (100 - p) percent passing. This makes
