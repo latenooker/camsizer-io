@@ -65,6 +65,23 @@ long = cs.to_long(runs)                    # tidy: sample × size_def × class
 phi (`phi = -log2(mm)`), and returns the Folk & Ward (1957) graphical measures.
 Percentiles use the sedimentological "percent coarser" convention.
 
+### Re-binning to a common grid
+
+The instrument reports the volume distribution on ~1000 fine classes — too noisy
+to read as a density and awkward to compare across runs with different class
+files. `rebin` re-bins a run onto arbitrary size-class edges *from the cumulative
+`Q3` curve*, so it conserves mass (no histogram re-assignment):
+
+```python
+edges = cs.log_edges(0.08, 20, 100)        # 100 log-spaced bins
+df = cs.rebin(run, edges)                   # bin_lower/upper/center, p3, Q3, density
+```
+
+`p3` is the exact volume % in each bin, and `density` is `p3` per `log10` size
+interval — the natural PDF on a log axis, where the area under the curve equals
+the covered volume percent. Only the size distribution is re-binned (not the
+class-mean shape characteristics).
+
 ## Usage — the experimental path (read the warning)
 
 Each `.xConAlp` record is `[2-byte flag][16 float32 descriptors][alpha raster]`.

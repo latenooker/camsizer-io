@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from .csv_reader import read_csv, read_export
 from .models import CamsizerRun, MeasurementRun, ParticleRecord, RunMeta, SIZE_DEF_ORDER
+from .rebin import log_edges, rebin
 from .run_reader import read_batch, read_run, to_long
 from .stats import FolkWard, folk_ward, percentile_mm
 from .xplorer import (
@@ -43,6 +44,8 @@ __all__ = [
     "folk_ward",
     "percentile_mm",
     "FolkWard",
+    "rebin",
+    "log_edges",
     "read_xplorer",
     "validate_structure",
     "XplorerRun",
