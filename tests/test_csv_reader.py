@@ -48,3 +48,21 @@ def test_particle_count_ground_truth(run):
 
 def test_p3_sums_to_100(run):
     assert run.psd["p3"].sum() == pytest.approx(100.0, abs=0.1)
+
+
+XLE = Path(__file__).parent / "fixtures" / "P_01_cs_xc_min_20260804_180031_003.xle"
+
+
+def test_read_csv_reads_xle_identically():
+    run = read_csv(XLE)
+    assert run.meta.size_model.startswith("xc_min")
+    assert run.meta.method_file == "X_Fall_PPX.afg"
+    assert run.summary["x50"] == pytest.approx(1.0993, abs=1e-4)
+
+
+def test_public_api_exports():
+    import camsizer_io as cs
+    for name in ("MeasurementRun", "read_run", "read_batch", "to_long",
+                 "read_export", "SIZE_DEF_ORDER"):
+        assert hasattr(cs, name), name
+    assert cs.read_export is cs.read_csv
