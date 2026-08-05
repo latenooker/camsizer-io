@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import re
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
 
+import pandas as pd
+
 from .csv_reader import read_csv
-from .models import CamsizerRun, MeasurementRun, SIZE_DEF_ORDER
+from .models import CamsizerRun, MeasurementRun, SIZE_DEF_ORDER, _LONG_COLUMNS
 
 # Filename token (as written by the software) -> canonical key, for cross-check.
 _TOKEN_TO_CANONICAL: dict[str, str] = {
@@ -142,3 +145,45 @@ def read_run(path: str | Path) -> MeasurementRun:
         runs=runs,
         source_dir=str(path.parent),
     )
+
+
+def read_batch(directory: str | Path, pattern: str = "*.xle") -> list[MeasurementRun]:
+    """Group every matching export in a directory into measurements.
+
+    Args:
+        directory: Directory to scan.
+        pattern: Glob for the export files (default ``*.xle``; use ``*.xld`` or
+            ``*.csv`` for other export variants).
+
+    Returns:
+        One :class:`MeasurementRun` per ``(sample, date, time, seq)`` group,
+        sorted by ``(sample, timestamp, seq)``. Files that do not match the run
+        filename pattern are ignored.
+    """
+    directory = Path(directory)
+    groups: dict[tuple[str, str, str, str], Path] = {}
+    for f in sorted(directory.glob(pattern)):
+        try:
+            sample, _token, date, time, seq = _parse_run_filename(f.name)
+        except ValueError:
+            continue
+        groups.setdefault((sample, date, time, seq), f)
+    runs = [read_run(anchor) for anchor in groups.values()]
+    return sorted(runs, key=lambda r: (r.sample, r.timestamp, r.seq))
+
+
+def to_long(runs: MeasurementRun | Iterable[MeasurementRun]) -> pd.DataFrame:
+    """Concatenate one or more measurements into a single tidy long table.
+
+    Args:
+        runs: A single :class:`MeasurementRun` or an iterable of them.
+
+    Returns:
+        The vertical concatenation of each run's :meth:`MeasurementRun.to_long`.
+    """
+    if isinstance(runs, MeasurementRun):
+        return runs.to_long()
+    frames = [r.to_long() for r in runs]
+    if not frames:
+        return pd.DataFrame(columns=_LONG_COLUMNS)
+    return pd.concat(frames, ignore_index=True)

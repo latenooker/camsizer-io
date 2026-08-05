@@ -84,3 +84,21 @@ def test_read_run_partial_warns(tmp_path):
     with pytest.warns(UserWarning):
         mrun = read_run(tmp_path / f"P_01_cs_xc_min_{_STAMP}.xle")
     assert set(mrun.size_defs) == {"xc_min", "x_area"}
+
+
+from camsizer_io import read_batch, to_long
+
+
+def test_read_batch_groups_one_run():
+    runs = read_batch(FIX, pattern="*.xle")
+    assert len(runs) == 1
+    assert set(runs[0].size_defs) == set(SIZE_DEF_ORDER)
+
+
+def test_to_long_accepts_single_and_list():
+    runs = read_batch(FIX, pattern="*.xle")
+    one = to_long(runs[0])
+    many = to_long(runs)
+    assert len(one) == 5 * 1002
+    assert len(many) == 5 * 1002
+    assert list(many.columns)[:4] == ["sample", "timestamp", "seq", "size_def"]

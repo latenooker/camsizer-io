@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from .csv_reader import read_csv
 from .models import CamsizerRun, ParticleRecord, RunMeta
-from .run_reader import read_run
+from .run_reader import read_batch, read_run, to_long
 from .stats import FolkWard, folk_ward, percentile_mm
 from .xplorer import (
     DESCRIPTOR_COLUMNS,
@@ -33,6 +33,8 @@ __version__ = "0.1.0"
 __all__ = [
     "read_csv",
     "read_run",
+    "read_batch",
+    "to_long",
     "CamsizerRun",
     "RunMeta",
     "folk_ward",
