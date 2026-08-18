@@ -124,8 +124,9 @@ rec = run.record(0)                         # rec.descriptors (16,), rec.alpha (
 >
 > **For publication-grade morphometry from the silhouette *images*, export from
 > Particle X-Plorer** and process with an image pipeline (scikit-image / OpenCV).
-> See `docs/format_notes.md` for the byte-layout findings and
-> `pparadox/docs/sop_camsizer_dry_psd.md` §10.2–10.3.
+> See [`docs/format_notes.md`](docs/format_notes.md) for the byte-layout
+> findings (the `sop_camsizer_dry_psd.md` §10.2–10.3 SOP referenced there lives
+> in the separate internal `pparadox` project, not this repo).
 
 ## Supported / not supported
 
