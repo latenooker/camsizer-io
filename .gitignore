@@ -3,6 +3,9 @@
 # .xConAlp lives outside git. See tests/fixtures/README.md.
 *.xConAlp
 
+# macOS
+.DS_Store
+
 # Python
 __pycache__/
 *.py[cod]

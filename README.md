@@ -82,6 +82,23 @@ interval — the natural PDF on a log axis, where the area under the curve equal
 the covered volume percent. Only the size distribution is re-binned (not the
 class-mean shape characteristics).
 
+### Command line
+
+A thin `camsizer-io` CLI wraps the reliable readers for quick inspection and
+tidy-table export — no Python needed:
+
+```bash
+camsizer-io read OK_sand_2_005.csv --stats     # print summary + Folk & Ward
+camsizer-io read OK_sand_2_005.csv -o psd      # write the per-class PSD table (psd.csv)
+camsizer-io run  P_01_cs_xc_min_..._003.xle -o long   # multi-size-def run → tidy long table
+camsizer-io batch ./exports -o all             # every run in a directory → one long table
+```
+
+`-o/--output` writes via the shared table writer; `-f/--format {csv,parquet}`
+selects the format (parquet needs the optional `pyarrow`). Without `-o`, `run`
+and `batch` print a short preview instead. The same writer is available in
+Python as `cs.write_table(df, path, fmt="csv")`.
+
 ## Usage — the experimental path (read the warning)
 
 Each `.xConAlp` record is `[2-byte flag][16 float32 descriptors][alpha raster]`.
