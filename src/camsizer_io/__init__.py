@@ -21,6 +21,7 @@ from .models import CamsizerRun, MeasurementRun, ParticleRecord, RunMeta, SIZE_D
 from .rebin import log_edges, rebin
 from .run_reader import read_batch, read_run, to_long
 from .stats import FolkWard, folk_ward, percentile_mm
+from .writers import write_table
 from .xplorer import (
     DESCRIPTOR_COLUMNS,
     StructureReport,
@@ -46,6 +47,7 @@ __all__ = [
     "FolkWard",
     "rebin",
     "log_edges",
+    "write_table",
     "read_xplorer",
     "validate_structure",
     "XplorerRun",
